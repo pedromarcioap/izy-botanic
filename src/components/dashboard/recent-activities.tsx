@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useLocalStorage } from '@/hooks/use-local-storage';
@@ -36,9 +35,7 @@ export function RecentActivities() {
       date: new Date(item.createdAt),
     }));
 
-    const combined = [...combinedQuiz, ...combinedLibrary];
-    
-    return combined
+    return [...combinedQuiz, ...combinedLibrary]
       .sort((a, b) => b.date.getTime() - a.date.getTime())
       .slice(0, 10)
       .map(activity => ({
