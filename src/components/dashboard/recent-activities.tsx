@@ -13,7 +13,7 @@ type Activity = {
     id: string;
     type: 'quiz' | 'library';
     title: string;
-    formattedDate: string;
+    date: Date;
 };
 
 export function RecentActivities() {
@@ -38,11 +38,7 @@ export function RecentActivities() {
 
     return combined
         .sort((a, b) => b.date.getTime() - a.date.getTime())
-        .slice(0, 10)
-        .map(item => ({
-            ...item,
-            formattedDate: formatDistanceToNow(item.date, { addSuffix: true, locale: ptBR })
-        }));
+        .slice(0, 10);
   }, [quizHistory, libraryItems]);
 
   const ActivityIcon = ({ type }: { type: 'quiz' | 'library' }) => {
@@ -70,7 +66,7 @@ export function RecentActivities() {
                     <div className="flex-grow">
                       <p className="text-sm font-medium leading-none">{activity.title}</p>
                       <p className="text-sm text-muted-foreground">
-                        {activity.formattedDate}
+                        {formatDistanceToNow(activity.date, { addSuffix: true, locale: ptBR })}
                       </p>
                     </div>
                   </div>
