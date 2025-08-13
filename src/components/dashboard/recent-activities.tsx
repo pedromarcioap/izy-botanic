@@ -14,7 +14,6 @@ interface Activity {
     type: 'quiz' | 'library';
     title: string;
     date: Date;
-    Icon: React.ElementType;
 }
 
 export function RecentActivities() {
@@ -28,14 +27,12 @@ export function RecentActivities() {
             type: 'quiz',
             title: `Quiz: ${item.topic}`,
             date: new Date(item.timestamp),
-            Icon: BrainCircuit
         })),
         ...libraryItems.map((item): Activity => ({
             id: item.id,
             type: 'library',
             title: `Material: ${item.title}`,
             date: new Date(item.createdAt),
-            Icon: FileText
         }))
     ];
 
@@ -43,6 +40,13 @@ export function RecentActivities() {
         .sort((a, b) => b.date.getTime() - a.date.getTime())
         .slice(0, 10);
   }, [quizHistory, libraryItems]);
+
+  const ActivityIcon = ({ type }: { type: 'quiz' | 'library' }) => {
+    if (type === 'quiz') {
+      return <BrainCircuit className="h-5 w-5 text-muted-foreground" />;
+    }
+    return <FileText className="h-5 w-5 text-muted-foreground" />;
+  };
 
   return (
     <Card>
@@ -58,7 +62,7 @@ export function RecentActivities() {
             <div className="space-y-4">
               {activities.map(activity => (
                   <div key={activity.id} className="flex items-center gap-4">
-                    <activity.Icon className="h-5 w-5 text-muted-foreground" />
+                    <ActivityIcon type={activity.type} />
                     <div className="flex-grow">
                       <p className="text-sm font-medium leading-none">{activity.title}</p>
                       <p className="text-sm text-muted-foreground">
