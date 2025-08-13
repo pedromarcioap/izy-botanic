@@ -9,6 +9,14 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useMemo } from 'react';
 
+// Moved ActivityIcon outside of the RecentActivities component
+const ActivityIcon = ({ type }: { type: 'quiz' | 'library' }) => {
+  if (type === 'quiz') {
+    return <BrainCircuit className="h-5 w-5 text-muted-foreground" />;
+  }
+  return <FileText className="h-5 w-5 text-muted-foreground" />;
+};
+
 type Activity = {
     id: string;
     type: 'quiz' | 'library';
@@ -43,13 +51,6 @@ export function RecentActivities() {
         formattedDate: formatDistanceToNow(activity.date, { addSuffix: true, locale: ptBR })
       }));
   }, [quizHistory, libraryItems]);
-
-  const ActivityIcon = ({ type }: { type: 'quiz' | 'library' }) => {
-    if (type === 'quiz') {
-      return <BrainCircuit className="h-5 w-5 text-muted-foreground" />;
-    }
-    return <FileText className="h-5 w-5 text-muted-foreground" />;
-  };
 
   return (
     <Card>
