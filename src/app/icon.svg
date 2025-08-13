@@ -1,0 +1,9 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M116.289 87.8812C113.633 82.3995 117.844 76 123.992 76H132.008C138.156 76 142.367 82.3995 139.711 87.8812L128 112L116.289 87.8812Z" fill="currentColor" fill-opacity="0.2"/>
+<path d="M160 96H192C205.255 96 216 106.745 216 120V152C216 165.255 205.255 176 192 176H176" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M96 96H64C50.7452 96 40 106.745 40 120V152C40 165.255 50.7452 176 64 176H80" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M128 224C167.765 224 200 191.765 200 152V120C200 80.2355 167.765 48 128 48C88.2355 48 56 80.2355 56 120V152C56 191.765 88.2355 224 128 224Z" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M128 176V144" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M128 80V48" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="128" cy="112" r="12" fill="currentColor"/>
+</svg>
