@@ -13,8 +13,8 @@ interface Activity {
     id: string;
     type: 'quiz' | 'library';
     title: string;
+    formattedDate: string;
     date: Date;
-    rawDate: string;
 }
 
 export function RecentActivities() {
@@ -22,26 +22,32 @@ export function RecentActivities() {
   const [libraryItems] = useLocalStorage<LibraryItem[]>('libraryItems', []);
 
   const activities = useMemo(() => {
-    const combined: Activity[] = [
-        ...(quizHistory || []).map((item): Activity => ({
+    const combined: Omit<Activity, 'date' | 'formattedDate'> & { rawDate: string }[] = [
+        ...(quizHistory || []).map((item) => ({
             id: item.id,
-            type: 'quiz',
+            type: 'quiz' as const,
             title: `Quiz: ${item.topic}`,
-            date: new Date(item.timestamp),
             rawDate: item.timestamp,
         })),
-        ...(libraryItems || []).map((item): Activity => ({
+        ...(libraryItems || []).map((item) => ({
             id: item.id,
-            type: 'library',
+            type: 'library' as const,
             title: `Material: ${item.title}`,
-            date: new Date(item.createdAt),
             rawDate: item.createdAt,
         }))
     ];
 
     return combined
+        .map(item => ({
+            ...item,
+            date: new Date(item.rawDate),
+        }))
         .sort((a, b) => b.date.getTime() - a.date.getTime())
-        .slice(0, 10);
+        .slice(0, 10)
+        .map(item => ({
+            ...item,
+            formattedDate: formatDistanceToNow(item.date, { addSuffix: true, locale: ptBR })
+        }));
   }, [quizHistory, libraryItems]);
 
   const ActivityIcon = ({ type }: { type: 'quiz' | 'library' }) => {
@@ -69,7 +75,7 @@ export function RecentActivities() {
                     <div className="flex-grow">
                       <p className="text-sm font-medium leading-none">{activity.title}</p>
                       <p className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(new Date(activity.rawDate), { addSuffix: true, locale: ptBR })}
+                        {activity.formattedDate}
                       </p>
                     </div>
                   </div>
