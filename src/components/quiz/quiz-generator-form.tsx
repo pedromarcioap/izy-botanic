@@ -302,8 +302,8 @@ export function QuizGeneratorForm() {
 
                     Em resumo, o viés de confirmação é um atalho mental estudado pela psicologia, que é amplificado por dinâmicas sociais e que representa um desafio filosófico antigo na nossa busca por conhecimento.
 
-                    Essa visão integrada ajuda a clarear o conceito? Talvez queira explorar como podemos tentar mitigar os efeitos desse viés no nosso dia a dia?""
-                  placeholder="Instruções personalizadas para a IA..."
+                    Essa visão integrada ajuda a clarear o conceito? Talvez queira explorar como podemos tentar mitigar os efeitos desse viés no nosso dia a dia?"
+                  placeholder="Instruções personalizadas para a IA, ou deixe em branco para o prompt padrão."
                   className="resize-none"
                   {...field}
                 />
