@@ -9,14 +9,39 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useMemo } from 'react';
 
+interface Activity {
+    id: string;
+    type: 'quiz' | 'library';
+    title: string;
+    date: Date;
+    Icon: React.ElementType;
+}
+
 export function RecentActivities() {
   const [quizHistory] = useLocalStorage<QuizAttempt[]>('quizHistory', []);
   const [libraryItems] = useLocalStorage<LibraryItem[]>('libraryItems', []);
 
   const activities = useMemo(() => {
-    return [...quizHistory, ...libraryItems]
-      .sort((a, b) => new Date(b.createdAt || b.timestamp).getTime() - new Date(a.createdAt || a.timestamp).getTime())
-      .slice(0, 10);
+    const combined = [
+        ...quizHistory.map(item => ({
+            id: item.id,
+            type: 'quiz' as const,
+            title: `Quiz: ${item.topic}`,
+            date: new Date(item.timestamp),
+            Icon: BrainCircuit
+        })),
+        ...libraryItems.map(item => ({
+            id: item.id,
+            type: 'library' as const,
+            title: `Material: ${item.title}`,
+            date: new Date(item.createdAt),
+            Icon: FileText
+        }))
+    ];
+
+    return combined
+        .sort((a, b) => b.date.getTime() - a.date.getTime())
+        .slice(0, 10);
   }, [quizHistory, libraryItems]);
 
   return (
@@ -31,24 +56,17 @@ export function RecentActivities() {
             <p className="text-sm text-muted-foreground text-center pt-4">Nenhuma atividade ainda.</p>
           ) : (
             <div className="space-y-4">
-              {activities.map(activity => {
-                const isQuiz = 'topic' in activity;
-                const Icon = isQuiz ? BrainCircuit : FileText;
-                const title = isQuiz ? `Quiz: ${activity.topic}` : `Material: ${activity.title}`;
-                const date = new Date(isQuiz ? activity.timestamp : activity.createdAt);
-                
-                return (
+              {activities.map(activity => (
                   <div key={activity.id} className="flex items-center gap-4">
-                    <Icon className="h-5 w-5 text-muted-foreground" />
+                    <activity.Icon className="h-5 w-5 text-muted-foreground" />
                     <div className="flex-grow">
-                      <p className="text-sm font-medium leading-none">{title}</p>
+                      <p className="text-sm font-medium leading-none">{activity.title}</p>
                       <p className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(date, { addSuffix: true, locale: ptBR })}
+                        {formatDistanceToNow(activity.date, { addSuffix: true, locale: ptBR })}
                       </p>
                     </div>
                   </div>
-                );
-              })}
+              ))}
             </div>
           )}
         </ScrollArea>
