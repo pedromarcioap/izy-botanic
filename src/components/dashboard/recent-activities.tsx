@@ -9,39 +9,34 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useMemo } from 'react';
 
-interface Activity {
+type Activity = {
     id: string;
     type: 'quiz' | 'library';
     title: string;
     formattedDate: string;
-    date: Date;
-}
+};
 
 export function RecentActivities() {
   const [quizHistory] = useLocalStorage<QuizAttempt[]>('quizHistory', []);
   const [libraryItems] = useLocalStorage<LibraryItem[]>('libraryItems', []);
 
-  const activities = useMemo(() => {
-    const combined: Omit<Activity, 'date' | 'formattedDate'> & { rawDate: string }[] = [
-        ...(quizHistory || []).map((item) => ({
+  const activities: Activity[] = useMemo(() => {
+    const combined = [
+        ...(quizHistory || []).map(item => ({
             id: item.id,
             type: 'quiz' as const,
             title: `Quiz: ${item.topic}`,
-            rawDate: item.timestamp,
+            date: new Date(item.timestamp),
         })),
-        ...(libraryItems || []).map((item) => ({
+        ...(libraryItems || []).map(item => ({
             id: item.id,
             type: 'library' as const,
             title: `Material: ${item.title}`,
-            rawDate: item.createdAt,
+            date: new Date(item.createdAt),
         }))
     ];
 
     return combined
-        .map(item => ({
-            ...item,
-            date: new Date(item.rawDate),
-        }))
         .sort((a, b) => b.date.getTime() - a.date.getTime())
         .slice(0, 10)
         .map(item => ({
