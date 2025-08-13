@@ -7,14 +7,17 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { FileText, BrainCircuit } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useMemo } from 'react';
 
 export function RecentActivities() {
   const [quizHistory] = useLocalStorage<QuizAttempt[]>('quizHistory', []);
   const [libraryItems] = useLocalStorage<LibraryItem[]>('libraryItems', []);
 
-  const activities = [...quizHistory, ...libraryItems]
-    .sort((a, b) => new Date(b.createdAt || b.timestamp).getTime() - new Date(a.createdAt || a.timestamp).getTime())
-    .slice(0, 10);
+  const activities = useMemo(() => {
+    return [...quizHistory, ...libraryItems]
+      .sort((a, b) => new Date(b.createdAt || b.timestamp).getTime() - new Date(a.createdAt || a.timestamp).getTime())
+      .slice(0, 10);
+  }, [quizHistory, libraryItems]);
 
   return (
     <Card>
