@@ -22,13 +22,13 @@ export function RecentActivities() {
 
   const activities = useMemo(() => {
     const combined: Activity[] = [
-        ...quizHistory.map((item): Activity => ({
+        ...(quizHistory || []).map((item): Activity => ({
             id: item.id,
             type: 'quiz',
             title: `Quiz: ${item.topic}`,
             date: new Date(item.timestamp),
         })),
-        ...libraryItems.map((item): Activity => ({
+        ...(libraryItems || []).map((item): Activity => ({
             id: item.id,
             type: 'library',
             title: `Material: ${item.title}`,

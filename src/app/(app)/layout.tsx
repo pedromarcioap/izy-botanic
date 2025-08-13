@@ -20,13 +20,43 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+function NavLinks() {
   const pathname = usePathname();
   const [isMounted, setIsMounted] = React.useState(false);
 
   React.useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Don't render anything on the server for the links, to avoid hydration mismatch
+  if (!isMounted) {
+    return null;
+  }
+
+  return (
+    <>
+      {NAV_LINKS.map((link) => (
+        <SidebarMenuItem key={link.href}>
+          <SidebarMenuButton
+            asChild
+            isActive={pathname === link.href}
+            tooltip={{
+              children: link.label,
+              side: 'right',
+            }}
+          >
+            <Link href={link.href}>
+              <link.icon />
+              <span>{link.label}</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      ))}
+    </>
+  );
+}
+
+export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
@@ -36,23 +66,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Logo />
           </SidebarHeader>
           <SidebarMenu className="flex-grow">
-            {NAV_LINKS.map((link) => (
-              <SidebarMenuItem key={link.href}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isMounted ? pathname === link.href : false}
-                  tooltip={{
-                    children: link.label,
-                    side: 'right',
-                  }}
-                >
-                  <Link href={link.href}>
-                    <link.icon />
-                    <span>{link.label}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
+            <NavLinks />
           </SidebarMenu>
         </SidebarContent>
       </Sidebar>
