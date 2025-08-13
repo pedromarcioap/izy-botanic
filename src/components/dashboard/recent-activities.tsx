@@ -22,17 +22,17 @@ export function RecentActivities() {
   const [libraryItems] = useLocalStorage<LibraryItem[]>('libraryItems', []);
 
   const activities = useMemo(() => {
-    const combined = [
-        ...quizHistory.map(item => ({
+    const combined: Activity[] = [
+        ...quizHistory.map((item): Activity => ({
             id: item.id,
-            type: 'quiz' as const,
+            type: 'quiz',
             title: `Quiz: ${item.topic}`,
             date: new Date(item.timestamp),
             Icon: BrainCircuit
         })),
-        ...libraryItems.map(item => ({
+        ...libraryItems.map((item): Activity => ({
             id: item.id,
-            type: 'library' as const,
+            type: 'library',
             title: `Material: ${item.title}`,
             date: new Date(item.createdAt),
             Icon: FileText
