@@ -22,6 +22,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [isClient, setIsClient] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   return (
     <SidebarProvider>
@@ -35,7 +40,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <SidebarMenuItem key={link.href}>
                 <SidebarMenuButton
                   asChild
-                  isActive={pathname === link.href}
+                  isActive={isClient ? pathname === link.href : false}
                   tooltip={{
                     children: link.label,
                     side: 'right',
