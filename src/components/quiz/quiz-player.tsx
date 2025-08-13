@@ -50,18 +50,33 @@ export function QuizPlayer() {
 
   const currentQuestion = activeQuiz.questions[currentQuestionIndex];
   const isStudyMode = settings.studyMode === 'Modo Estudo';
+  const isLastQuestion = currentQuestionIndex === activeQuiz.questions.length - 1;
+
+
+  const recordAnswer = (answer: string) => {
+    const isCorrect = answer === currentQuestion.correctAnswer;
+    const newAnswer: UserAnswer = { 
+        question: currentQuestion.question, 
+        selectedAnswer: answer, 
+        isCorrect 
+    };
+    setUserAnswers(prev => [...prev, newAnswer]);
+    return newAnswer;
+  }
 
   const handleAnswerSubmit = () => {
     if (!selectedAnswer) return;
 
-    const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
-    const answer: UserAnswer = { question: currentQuestion.question, selectedAnswer, isCorrect };
-    setUserAnswers([...userAnswers, answer]);
+    recordAnswer(selectedAnswer);
     
     if (isStudyMode) {
       setIsAnswered(true);
     } else {
-      handleNextQuestion();
+      if (isLastQuestion) {
+        finishQuiz();
+      } else {
+        handleNextQuestion();
+      }
     }
   };
 
@@ -69,45 +84,36 @@ export function QuizPlayer() {
     setIsAnswered(false);
     setSelectedAnswer(null);
 
-    if (currentQuestionIndex < activeQuiz.questions.length - 1) {
+    if (!isLastQuestion) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
       finishQuiz();
     }
   };
-
+  
   const finishQuiz = () => {
-    const finalAnswers = [...userAnswers];
-    // Ensure the last answer is added if not in study mode
-     if (!isStudyMode && selectedAnswer) {
-        const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
-        const answer: UserAnswer = { question: currentQuestion.question, selectedAnswer, isCorrect };
-        finalAnswers.push(answer);
-     }
+    // This is a new function to ensure the final state of answers is used
+    // It uses a callback with the state updater to get the most recent answers
+    setUserAnswers(finalAnswers => {
+        const newAttempt: QuizAttempt = {
+          id: new Date().toISOString(),
+          topic: settings.topic,
+          timestamp: new Date().toISOString(),
+          score: finalAnswers.filter(a => a.isCorrect).length,
+          totalQuestions: activeQuiz.questions.length,
+          answers: finalAnswers,
+          quiz: activeQuiz,
+          settings: settings,
+        };
 
-    const newAttempt: QuizAttempt = {
-      id: new Date().toISOString(),
-      topic: settings.topic,
-      timestamp: new Date().toISOString(),
-      score: finalAnswers.filter(a => a.isCorrect).length,
-      totalQuestions: activeQuiz.questions.length,
-      answers: finalAnswers,
-      quiz: activeQuiz,
-      settings: settings,
-    };
+        setQuizHistory([newAttempt, ...quizHistory]);
+        setActiveQuiz(null);
 
-    setQuizHistory([newAttempt, ...quizHistory]);
-    setActiveQuiz(null);
+        toast({ title: "Quiz finalizado!", description: "Seu resultado foi salvo no histórico." });
+        router.push(`/analysis?quizId=${newAttempt.id}`);
 
-    toast({ title: "Quiz finalizado!", description: "Seu resultado foi salvo no histórico." });
-    router.push('/dashboard');
-  };
-
-  const getOptionClass = (option: string) => {
-    if (!isAnswered || !isStudyMode) return '';
-    if (option === currentQuestion.correctAnswer) return 'bg-green-100 dark:bg-green-900/50 border-green-500';
-    if (option === selectedAnswer && option !== currentQuestion.correctAnswer) return 'bg-red-100 dark:bg-red-900/50 border-red-500';
-    return '';
+        return finalAnswers;
+    });
   };
 
   return (
@@ -147,14 +153,14 @@ export function QuizPlayer() {
             disabled={isAnswered}
           >
             {currentQuestion.options.map((option, index) => (
-              <div key={index} className={cn("flex items-center space-x-3 space-y-0 p-3 rounded-lg border transition-all", getOptionClass(option))}>
+              <div key={index} className={cn("flex items-center space-x-3 space-y-0 p-3 rounded-lg border transition-all", isAnswered && isStudyMode && (option === currentQuestion.correctAnswer ? 'bg-green-100 dark:bg-green-900/50 border-green-500' : (option === selectedAnswer ? 'bg-red-100 dark:bg-red-900/50 border-red-500' : '')))}>
                 <RadioGroupItem value={option} id={`option-${index}`} />
                 <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer">{option}</Label>
               </div>
             ))}
           </RadioGroup>
 
-          {isAnswered && isStudyMode && (
+          {isAnswered && isStudyMode && currentQuestion.explanation && (
             <Alert className="mt-6" variant={userAnswers[userAnswers.length-1]?.isCorrect ? 'default' : 'destructive'}>
               {userAnswers[userAnswers.length-1]?.isCorrect ? 
                 <CheckCircle className="h-4 w-4" /> :
@@ -170,17 +176,17 @@ export function QuizPlayer() {
         <CardFooter>
             {isAnswered && isStudyMode ? (
                 <Button onClick={handleNextQuestion} className="w-full">
-                    {currentQuestionIndex < activeQuiz.questions.length - 1 ? 'Próxima Questão' : 'Finalizar Quiz'}
+                    {isLastQuestion ? 'Finalizar Quiz' : 'Próxima Questão'}
                     <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
             ) : (
                 <Button 
-                  onClick={isStudyMode ? handleAnswerSubmit : (currentQuestionIndex < activeQuiz.questions.length - 1 ? handleAnswerSubmit : finishQuiz)} 
+                  onClick={handleAnswerSubmit} 
                   disabled={!selectedAnswer} 
                   className="w-full"
                 >
-                  {currentQuestionIndex < activeQuiz.questions.length - 1 ? 'Confirmar e Próxima' : 'Finalizar Quiz'}
-                  {currentQuestionIndex < activeQuiz.questions.length - 1 ? <ArrowRight className="ml-2 h-4 w-4" /> : <Flag className="ml-2 h-4 w-4" />}
+                  {isLastQuestion ? 'Finalizar Quiz' : (isStudyMode ? 'Confirmar' : 'Próxima')}
+                  {isLastQuestion ? <Flag className="ml-2 h-4 w-4" /> : <ArrowRight className="ml-2 h-4 w-4" />}
                 </Button>
             )}
         </CardFooter>

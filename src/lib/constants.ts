@@ -1,4 +1,4 @@
-import { LayoutDashboard, PlusCircle, Library, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Library, BarChart3, MessageSquare } from 'lucide-react';
 
 export const NAV_LINKS = [
   {
@@ -17,8 +17,13 @@ export const NAV_LINKS = [
     icon: Library,
   },
   {
+      href: '/chat',
+      label: 'Mentor IA',
+      icon: MessageSquare
+  },
+  {
     href: '/analysis',
-    label: 'Análise de Desempenho',
+    label: 'Análise',
     icon: BarChart3,
   },
 ];

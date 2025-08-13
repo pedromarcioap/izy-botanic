@@ -44,3 +44,8 @@ export interface LibraryItem {
   content: string;
   createdAt: string;
 }
+
+export interface Message {
+  role: 'user' | 'model';
+  content: string;
+}

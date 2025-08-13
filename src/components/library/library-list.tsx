@@ -4,7 +4,7 @@ import { useLocalStorage } from '@/hooks/use-local-storage';
 import type { LibraryItem } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, Trash2 } from 'lucide-react';
+import { FileText, MessageSquare, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
 export function LibraryList() {
@@ -43,7 +43,13 @@ export function LibraryList() {
             </CardContent>
             <CardFooter className="flex gap-2">
                 <Button asChild size="sm" className="flex-1">
-                <Link href={`/generate?sourceId=${item.id}`}>Gerar Quiz</Link>
+                  <Link href={`/generate?sourceId=${item.id}`}>Gerar Quiz</Link>
+                </Button>
+                <Button asChild variant="secondary" size="sm" className="flex-1">
+                   <Link href={`/chat?sourceId=${item.id}`}>
+                    <MessageSquare className="mr-2 h-4 w-4"/>
+                    Mentor
+                   </Link>
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => handleDelete(item.id)} aria-label={`Deletar ${item.title}`}>
                     <Trash2 className="h-4 w-4" />
