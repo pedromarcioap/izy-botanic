@@ -14,6 +14,7 @@ interface Activity {
     type: 'quiz' | 'library';
     title: string;
     date: Date;
+    rawDate: string;
 }
 
 export function RecentActivities() {
@@ -27,12 +28,14 @@ export function RecentActivities() {
             type: 'quiz',
             title: `Quiz: ${item.topic}`,
             date: new Date(item.timestamp),
+            rawDate: item.timestamp,
         })),
         ...(libraryItems || []).map((item): Activity => ({
             id: item.id,
             type: 'library',
             title: `Material: ${item.title}`,
             date: new Date(item.createdAt),
+            rawDate: item.createdAt,
         }))
     ];
 
@@ -66,7 +69,7 @@ export function RecentActivities() {
                     <div className="flex-grow">
                       <p className="text-sm font-medium leading-none">{activity.title}</p>
                       <p className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(activity.date, { addSuffix: true, locale: ptBR })}
+                        {formatDistanceToNow(new Date(activity.rawDate), { addSuffix: true, locale: ptBR })}
                       </p>
                     </div>
                   </div>
