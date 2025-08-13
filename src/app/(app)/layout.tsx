@@ -28,11 +28,12 @@ function NavLinks() {
     setIsMounted(true);
   }, []);
 
-  // Don't render anything on the server for the links, to avoid hydration mismatch
   if (!isMounted) {
+    // On the server, or before the first client-side render, don't render the links
+    // This prevents the hydration mismatch
     return null;
   }
-
+  
   return (
     <>
       {NAV_LINKS.map((link) => (

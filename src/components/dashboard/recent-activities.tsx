@@ -21,20 +21,21 @@ export function RecentActivities() {
   const [libraryItems] = useLocalStorage<LibraryItem[]>('libraryItems', []);
 
   const activities = useMemo(() => {
-    const combined = [
-      ...(quizHistory || []).map(item => ({
-        id: item.id,
-        type: 'quiz' as const,
-        title: `Quiz: ${item.topic}`,
-        date: new Date(item.timestamp),
-      })),
-      ...(libraryItems || []).map(item => ({
-        id: item.id,
-        type: 'library' as const,
-        title: `Material: ${item.title}`,
-        date: new Date(item.createdAt),
-      }))
-    ];
+    const combinedQuiz = (quizHistory || []).map(item => ({
+      id: item.id,
+      type: 'quiz' as const,
+      title: `Quiz: ${item.topic}`,
+      date: new Date(item.timestamp),
+    }));
+
+    const combinedLibrary = (libraryItems || []).map(item => ({
+      id: item.id,
+      type: 'library' as const,
+      title: `Material: ${item.title}`,
+      date: new Date(item.createdAt),
+    }));
+
+    const combined = [...combinedQuiz, ...combinedLibrary];
     
     return combined
       .sort((a, b) => b.date.getTime() - a.date.getTime())
