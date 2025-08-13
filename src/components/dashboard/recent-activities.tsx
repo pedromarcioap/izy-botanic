@@ -20,29 +20,29 @@ export function RecentActivities() {
   const [quizHistory] = useLocalStorage<QuizAttempt[]>('quizHistory', []);
   const [libraryItems] = useLocalStorage<LibraryItem[]>('libraryItems', []);
 
-  const activities: Activity[] = useMemo(() => {
+  const activities = useMemo(() => {
     const combined = [
-        ...(quizHistory || []).map(item => ({
-            id: item.id,
-            type: 'quiz' as const,
-            title: `Quiz: ${item.topic}`,
-            date: new Date(item.timestamp),
-        })),
-        ...(libraryItems || []).map(item => ({
-            id: item.id,
-            type: 'library' as const,
-            title: `Material: ${item.title}`,
-            date: new Date(item.createdAt),
-        }))
+      ...(quizHistory || []).map(item => ({
+        id: item.id,
+        type: 'quiz' as const,
+        title: `Quiz: ${item.topic}`,
+        date: new Date(item.timestamp),
+      })),
+      ...(libraryItems || []).map(item => ({
+        id: item.id,
+        type: 'library' as const,
+        title: `Material: ${item.title}`,
+        date: new Date(item.createdAt),
+      }))
     ];
-
+    
     return combined
-        .sort((a, b) => b.date.getTime() - a.date.getTime())
-        .slice(0, 10)
-        .map(activity => ({
-            ...activity,
-            formattedDate: formatDistanceToNow(activity.date, { addSuffix: true, locale: ptBR })
-        }));
+      .sort((a, b) => b.date.getTime() - a.date.getTime())
+      .slice(0, 10)
+      .map(activity => ({
+        ...activity,
+        formattedDate: formatDistanceToNow(activity.date, { addSuffix: true, locale: ptBR })
+      }));
   }, [quizHistory, libraryItems]);
 
   const ActivityIcon = ({ type }: { type: 'quiz' | 'library' }) => {
