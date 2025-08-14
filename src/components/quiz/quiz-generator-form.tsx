@@ -18,8 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
-import { generateQuiz } from '@/ai/flows/generate-quiz';
-import { analyzeQuizHistoryFlow } from '@/ai/flows/analyze-quiz-history';
+import { generateQuizAction, analyzeHistoryAction } from '@/ai/actions';
 import type { Quiz, QuizSettings, QuizAttempt, LibraryItem } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
@@ -105,12 +104,8 @@ export function QuizGeneratorForm() {
 
         const settings: QuizSettings = { ...values, systemPrompt: finalSystemPrompt, sourceContent: sourceContent };
         
-        const quiz = await generateQuiz(settings);
+        const quiz = await generateQuizAction(settings);
         
-        if (!quiz || !quiz.questions || quiz.questions.length === 0) {
-          throw new Error('A IA não retornou um quiz válido. Tente novamente.');
-        }
-
         const quizWithTitle: Quiz = { ...quiz, title: settings.topic };
 
         setActiveQuiz(quizWithTitle);
@@ -138,7 +133,7 @@ export function QuizGeneratorForm() {
       try {
         const historyCollectionRef = collection(db, 'users', TEMP_USER_ID, 'quizAttempts');
         const historySnapshot = await getDocs(historyCollectionRef);
-        const quizAttempts = historySnapshot.docs.map(doc => doc.data() as QuizAttempt);
+        const quizAttempts = historySnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}) as QuizAttempt);
 
         if (quizAttempts.length === 0) {
           toast({
@@ -149,7 +144,7 @@ export function QuizGeneratorForm() {
           return;
         }
 
-        const analysis = await analyzeQuizHistoryFlow.run(quizAttempts);
+        const analysis = await analyzeHistoryAction(quizAttempts);
         if (analysis.weakestTopics.length > 0) {
           form.setValue('topic', analysis.weakestTopics.join(', '));
           toast({ title: 'Tópico preenchido!', description: 'Foco nos seus pontos a melhorar.' });
@@ -385,7 +380,7 @@ export function QuizGeneratorForm() {
                 <FormLabel>Busca Web Automática</FormLabel>
                 <FormDescription>
                   Permitir que a IA pesquise na web por informações atualizadas.
-                </FormDescription>
+                </Description>
               </div>
             </FormItem>
           )}

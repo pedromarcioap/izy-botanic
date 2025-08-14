@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Send, Bot, User } from 'lucide-react';
 import type { Message } from '@/lib/types';
-import { talkToMentor } from '@/ai/flows/mentor-chat';
+import { mentorChatAction } from '@/ai/actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -42,10 +42,7 @@ export function ChatInterface({ sourceContent }: ChatInterfaceProps) {
         const modelMessagePlaceholder: Message = { role: 'model', content: '' };
         setChatHistory(prev => [...prev, modelMessagePlaceholder]);
         
-        const responseText = await talkToMentor({
-            messages: inputMessages,
-            sourceContent: context,
-        });
+        const responseText = await mentorChatAction(inputMessages, context);
 
         setChatHistory(prev => {
             const newHistory = [...prev];
