@@ -1,48 +1,44 @@
-'use server';
 
-/**
- * @fileOverview Provides an AI-powered analysis of a user's quiz history.
- *
- * - getAIAnalysisStream - A function that analyzes quiz history and provides feedback and a study plan.
- * - AIAnalysisInput - The input type for the getAIAnalysisStream function.
- * - AIAnalysisOutput - The return type for the getAIAnalysisStream function.
- */
+import { defineFlow, run } from '@genkit-ai/flow';
+import { z } from 'zod';
+import { ai } from '../genkit';
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+// Define the Zod schema for the input
+const QuizAttemptSchemaForAnalysis = z.object({
+    topic: z.string(),
+    score: z.number(),
+    totalQuestions: z.number(),
+    // Include other fields from QuizAttempt that are relevant for the analysis
+}).passthrough(); // Use passthrough to allow other fields without validation
 
-const AIAnalysisInputSchema = z.object({
-  quizHistory: z.string().describe('The user quiz history in JSON format.'),
-});
-export type AIAnalysisInput = z.infer<typeof AIAnalysisInputSchema>;
-
-const AIAnalysisOutputSchema = z.any();
-export type AIAnalysisOutput = z.infer<typeof AIAnalysisOutputSchema>;
-
-export async function getAIAnalysisStream(input: AIAnalysisInput): Promise<AIAnalysisOutput> {
-  return analyzeQuizHistoryFlow(input);
-}
-
-const analyzeQuizHistoryPrompt = ai.definePrompt({
-  name: 'analyzeQuizHistoryPrompt',
-  input: {schema: AIAnalysisInputSchema},
-  prompt: `You are an expert psychology tutor, skilled at analyzing student performance and providing personalized feedback.
-
-  Analyze the following quiz history and provide a structured analysis in Markdown format, including a summary, identification of strengths and weaknesses, and a suggested study plan.
-
-  Quiz History (JSON):
-  {{{quizHistory}}}
-  `,
-});
-
-const analyzeQuizHistoryFlow = ai.defineFlow(
+export const analyzeQuizHistoryFlow = defineFlow(
   {
     name: 'analyzeQuizHistoryFlow',
-    inputSchema: AIAnalysisInputSchema,
-    outputSchema: AIAnalysisOutputSchema,
+    inputSchema: z.array(QuizAttemptSchemaForAnalysis),
+    outputSchema: z.object({
+        weakestTopics: z.array(z.string()),
+        performanceSummary: z.string(),
+    }),
   },
-  async input => {
-    const {output} = await analyzeQuizHistoryPrompt(input);
-    return output!;
+  async (history) => {
+    if (history.length === 0) {
+        return { weakestTopics: [], performanceSummary: "Nenhum histórico de quiz encontrado." };
+    }
+    
+    const prompt = `Analise o seguinte histórico de tentativas de quiz de um aluno. Identifique os tópicos em que o aluno teve o pior desempenho (menor pontuação). Retorne um objeto JSON com duas chaves: "weakestTopics", uma lista dos 3 piores tópicos, e "performanceSummary", um breve resumo do desempenho geral. Histórico: ${JSON.stringify(history)}`;
+    
+    const llmResponse = await ai.generate({
+        prompt,
+        config: { responseMimeType: 'application/json' }
+    });
+
+    try {
+        const resultText = llmResponse.text();
+        const result = JSON.parse(resultText);
+        return result;
+    } catch (e) {
+        console.error("Error parsing JSON from AI response:", e, "Raw text:", llmResponse.text());
+        return { weakestTopics: [], performanceSummary: "A IA retornou um formato inesperado." };
+    }
   }
 );

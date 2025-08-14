@@ -1,9 +1,12 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import type { Quiz, QuizSettings, QuizAttempt, UserAnswer } from '@/lib/types';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -25,13 +28,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
+const TEMP_USER_ID = 'temp-user';
+
 export function QuizPlayer() {
   const router = useRouter();
   const { toast } = useToast();
   const [activeQuiz, setActiveQuiz] = useLocalStorage<Quiz | null>('activeQuiz', null);
   const [settings] = useLocalStorage<QuizSettings | null>('activeQuizSettings', null);
-  const [quizHistory, setQuizHistory] = useLocalStorage<QuizAttempt[]>('quizHistory', []);
-
+  
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
@@ -91,29 +95,40 @@ export function QuizPlayer() {
     }
   };
   
-  const finishQuiz = () => {
-    // This is a new function to ensure the final state of answers is used
-    // It uses a callback with the state updater to get the most recent answers
-    setUserAnswers(finalAnswers => {
-        const newAttempt: QuizAttempt = {
-          id: new Date().toISOString(),
-          topic: settings.topic,
-          timestamp: new Date().toISOString(),
-          score: finalAnswers.filter(a => a.isCorrect).length,
-          totalQuestions: activeQuiz.questions.length,
-          answers: finalAnswers,
-          quiz: activeQuiz,
-          settings: settings,
-        };
+  const finishQuiz = async () => {
+    const finalAnswers = [...userAnswers];
+    if (selectedAnswer && !isStudyMode) {
+       const lastAnswer = recordAnswer(selectedAnswer);
+       finalAnswers.push(lastAnswer);
+    }
 
-        setQuizHistory([newAttempt, ...quizHistory]);
+    // Explicitly define the type for the new object to be saved
+    const newAttemptData = {
+        topic: settings.topic,
+        timestamp: serverTimestamp(), // This is a FieldValue, handled by types.ts
+        score: finalAnswers.filter(a => a.isCorrect).length,
+        totalQuestions: activeQuiz.questions.length,
+        answers: finalAnswers,
+        quiz: activeQuiz,
+        settings: settings,
+    };
+
+    try {
+        const historyCollectionRef = collection(db, 'users', TEMP_USER_ID, 'quizAttempts');
+        const docRef = await addDoc(historyCollectionRef, newAttemptData);
+        
         setActiveQuiz(null);
 
         toast({ title: "Quiz finalizado!", description: "Seu resultado foi salvo no histórico." });
-        router.push(`/analysis?quizId=${newAttempt.id}`);
-
-        return finalAnswers;
-    });
+        router.push(`/analysis?quizId=${docRef.id}`);
+    } catch (error) {
+        console.error("Error saving quiz attempt:", error);
+        toast({
+            variant: "destructive",
+            title: "Erro ao Salvar",
+            description: "Não foi possível salvar seu resultado."
+        });
+    }
   };
 
   return (

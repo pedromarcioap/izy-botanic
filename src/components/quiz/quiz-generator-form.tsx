@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -5,6 +6,8 @@ import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, query, onSnapshot, orderBy } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -16,9 +19,15 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import { generateQuiz } from '@/ai/flows/generate-quiz';
-import type { Quiz, QuizSettings } from '@/lib/types';
+import { analyzeQuizHistoryFlow } from '@/ai/flows/analyze-quiz-history';
+import type { Quiz, QuizSettings, QuizAttempt, LibraryItem } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+
+const DEFAULT_SYSTEM_PROMPT = `Você é um professor experiente e amigável. Seu objetivo é criar quizzes educativos e envolventes, garantindo a precisão das informações e a clareza das perguntas. Foque em cobrir os tópicos de forma abrangente e fornecer perguntas com diferentes níveis de complexidade de distratores, conforme especificado nas configurações.`;
+const TEMP_USER_ID = 'temp-user';
 
 const formSchema = z.object({
   topic: z.string().min(3, { message: 'O tópico deve ter pelo menos 3 caracteres.' }),
@@ -38,7 +47,19 @@ export function QuizGeneratorForm() {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [sourceContent, setSourceContent] = useState<string | undefined>(undefined);
-  const [libraryItems] = useLocalStorage<any[]>('libraryItems', []);
+  const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
+
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+    const libraryCollectionRef = collection(db, 'users', TEMP_USER_ID, 'libraryItems');
+    const q = query(libraryCollectionRef, orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LibraryItem));
+        setLibraryItems(items);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -55,20 +76,21 @@ export function QuizGeneratorForm() {
   });
   
   useEffect(() => {
+    if (!isMounted) return;
     const topic = searchParams.get('topic');
     const sourceId = searchParams.get('sourceId');
 
     if (topic) {
         form.setValue('topic', topic);
     }
-    if (sourceId) {
+    if (sourceId && libraryItems.length > 0) {
         const item = libraryItems.find(i => i.id === sourceId);
         if(item) {
             setSourceContent(item.content);
             form.setValue('topic', item.title);
         }
     }
-  }, [searchParams, form, libraryItems]);
+  }, [searchParams, form, libraryItems, isMounted]);
 
   const [, setActiveQuiz] = useLocalStorage<Quiz | null>('activeQuiz', null);
   const [, setQuizSettings] = useLocalStorage<QuizSettings | null>('activeQuizSettings', null);
@@ -76,14 +98,22 @@ export function QuizGeneratorForm() {
   function onSubmit(values: z.infer<typeof formSchema>) {
     startTransition(async () => {
       try {
-        const settings: QuizSettings = { ...values, sourceContent: sourceContent };
+        const finalSystemPrompt =
+          values.systemPrompt && values.systemPrompt.trim() !== ''
+            ? values.systemPrompt
+            : DEFAULT_SYSTEM_PROMPT;
+
+        const settings: QuizSettings = { ...values, systemPrompt: finalSystemPrompt, sourceContent: sourceContent };
+        
         const quiz = await generateQuiz(settings);
         
         if (!quiz || !quiz.questions || quiz.questions.length === 0) {
           throw new Error('A IA não retornou um quiz válido. Tente novamente.');
         }
 
-        setActiveQuiz(quiz);
+        const quizWithTitle: Quiz = { ...quiz, title: settings.topic };
+
+        setActiveQuiz(quizWithTitle);
         setQuizSettings(settings);
 
         toast({
@@ -102,7 +132,53 @@ export function QuizGeneratorForm() {
     });
   }
 
+  function handlePersonalizeFromWeakness() {
+    startTransition(async () => {
+      toast({ title: 'Analisando seu desempenho...' });
+      try {
+        const historyCollectionRef = collection(db, 'users', TEMP_USER_ID, 'quizAttempts');
+        const historySnapshot = await getDocs(historyCollectionRef);
+        const quizAttempts = historySnapshot.docs.map(doc => doc.data() as QuizAttempt);
+
+        if (quizAttempts.length === 0) {
+          toast({
+            variant: 'destructive',
+            title: 'Histórico Insuficiente',
+            description: 'Não há dados de quizzes para analisar seu desempenho.',
+          });
+          return;
+        }
+
+        const analysis = await analyzeQuizHistoryFlow.run(quizAttempts);
+        if (analysis.weakestTopics.length > 0) {
+          form.setValue('topic', analysis.weakestTopics.join(', '));
+          toast({ title: 'Tópico preenchido!', description: 'Foco nos seus pontos a melhorar.' });
+        } else {
+          toast({ title: 'Tudo certo!', description: 'Não encontramos pontos fracos específicos.' });
+        }
+      } catch (error) {
+        console.error("Error analyzing history:", error)
+        toast({ variant: 'destructive', title: 'Erro na Análise', description: 'Não foi possível analisar seu histórico.' });
+      }
+    });
+  }
+  
+  if (!isMounted) {
+    return null; 
+  }
+
   return (
+    <Card className="max-w-3xl mx-auto my-8">
+    <CardHeader>
+      <CardTitle className="text-2xl font-bold">Gerador de Quiz</CardTitle>
+      <CardDescription>
+        Personalize as configurações para gerar um quiz sob medida para você.
+      </CardDescription>
+    </CardHeader>
+    <CardContent>
+    <Button variant="outline" onClick={handlePersonalizeFromWeakness} className="w-full mb-6" disabled={isPending}>
+        {isPending ? 'Analisando...' : 'Personalizar com base nos pontos fracos'}
+    </Button>
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <FormField
@@ -226,84 +302,66 @@ export function QuizGeneratorForm() {
           )}
         />
         <FormField
+              control={form.control}
+              name="sourceContent"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Conteúdo de Origem para o Quiz (Opcional)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Cole aqui o texto, artigo ou anotações que o AI deve usar como base para gerar o quiz."
+                      className="min-h-[150px]"
+                      value={sourceContent || ''}
+                      onChange={(e) => {
+                        setSourceContent(e.target.value);
+                        field.onChange(e.target.value);
+                      }}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Se fornecido, a IA gerará o quiz com base neste conteúdo.
+                  </FormDescription>
+                  <FormMessage />
+                  {libraryItems.length > 0 && (
+                    <div className="mt-4">
+                      <FormLabel>Ou selecione da sua biblioteca:</FormLabel>
+                      <Select onValueChange={(value) => {
+                        const selectedItem = libraryItems.find(item => item.id === value);
+                        if (selectedItem) {
+                          setSourceContent(selectedItem.content);
+                          form.setValue('sourceContent', selectedItem.content);
+                        } else {
+                          setSourceContent('');
+                          form.setValue('sourceContent', '');
+                        }
+                      }}>
+                        <SelectTrigger className="mt-2">
+                          <SelectValue placeholder="Selecione um item da biblioteca" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {libraryItems.map((item: any) => (
+                            <SelectItem key={item.id} value={item.id}>
+                              {item.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </FormItem>
+              )}
+            />
+        <Separator/>
+        <h3 className="text-lg font-semibold -mb-4">Opções Avançadas</h3>
+        <FormField
           control={form.control}
           name="systemPrompt"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>System Prompt (Avançado)</FormLabel>
+              <FormLabel>Instruções para a IA</FormLabel>
               <FormControl>
                 <Textarea
-                  value="1. PERSONA:
-                    Você é a "Professora Izy", uma mentora sênior e especialista em Psicologia com um profundo conhecimento interdisciplinar. Sua paixão não é apenas a mente humana, mas como ela é moldada e refletida pela Filosofia, Sociologia, Antropologia, História e até mesmo pelas Artes. Você é paciente, didática, cortês e tem um talento especial para tornar temas complexos em conversas claras e fascinantes.
-
-                    2. OBJETIVO PRINCIPAL:
-                    Seu objetivo é atuar como uma mentora para mim, guiando-me através das complexidades do comportamento humano. Você deve não apenas responder às minhas perguntas, mas também enriquecer a conversa, tecendo conexões entre diferentes campos do saber. Sua missão é elucidar, inspirar a curiosidade e promover um entendimento profundo e coeso.
-
-                    3. DIRETRIZES DE ATUAÇÃO:
-
-                    Ponto de Partida na Psicologia: Sempre que eu fizer uma pergunta, comece a resposta ancorando o conceito no campo da psicologia. Use uma linguagem clara, direta e didática, como se estivesse explicando para um aluno interessado.
-
-                    Expansão Interdisciplinar: Após estabelecer a base psicológica, expanda a análise de forma orgânica. Mostre como:
-
-                    A Filosofia questiona os fundamentos e as implicações existenciais do conceito.
-
-                    A Sociologia analisa como esse conceito se manifesta em grupos, instituições e na sociedade.
-
-                    A Antropologia compara como o conceito é entendido ou expresso em diferentes culturas e épocas.
-
-                    Outras áreas (História, Artes, etc.) podem oferecer perspectivas adicionais.
-
-                    Didática e Simplicidade:
-
-                    Use analogias, metáforas e exemplos do cotidiano para ilustrar pontos complexos.
-
-                    Evite jargões técnicos. Se precisar usar um termo específico, explique-o imediatamente de forma simples.
-
-                    Estruture suas respostas com parágrafos curtos, listas (bullet points) ou negrito para facilitar a leitura e a compreensão.
-
-                    Antecipação de Dúvidas: Esta é uma diretriz crucial. Após explicar um ponto importante, antecipe uma dúvida que eu poderia ter. Use frases como:
-
-                    "Isso pode soar um pouco abstrato, então vamos a um exemplo..."
-
-                    "Uma dúvida comum aqui é: qual a diferença entre X e Y? A resposta está na..."
-
-                    "Você talvez esteja se perguntando: isso sempre foi assim? Olhando para a história, vemos que..."
-
-                    Depois de introduzir a dúvida, responda-a de forma clara e concisa.
-
-                    Tom e Linguagem:
-
-                    Seu tom deve ser sempre acolhedor, encorajador e cortês.
-
-                    Use frases como "Excelente pergunta!", "Fico feliz que tenha tocado nesse ponto", "Vamos explorar isso juntos".
-
-                    Trate-me como um colega em uma jornada de aprendizado, não como alguém que simplesmente não sabe.
-
-                    Encerramento Interativo: Conclua suas respostas com uma síntese e uma pergunta aberta para me incentivar a continuar a conversa. Exemplos:
-
-                    "Em resumo, vimos como [conceito] é visto pela psicologia e como a sociologia e a filosofia expandem nossa compreensão. Fez sentido para você? Sobre qual dessas conexões gostaria de se aprofundar?"
-
-                    "Espero que esta explicação tenha sido clara. O que mais lhe intriga sobre este assunto?"
-
-                    EXEMPLO DE INTERAÇÃO IDEAL:
-
-                    Eu: "O que é o 'viés de confirmação'?"
-
-                    Você (Professora Izy):
-                    "Olá! Que pergunta excelente e muito relevante para os dias de hoje. Vamos explorar isso juntos.
-
-                    Do ponto de vista da Psicologia, o viés de confirmação é uma tendência cognitiva, um atalho mental que todos nós temos. Ele nos faz buscar, interpretar, favorecer e lembrar de informações que confirmam ou apoiam nossas crenças e hipóteses preexistentes. É como usar um holofote que ilumina apenas as evidências que concordam conosco, enquanto o resto fica na penumbra.
-
-                    Agora, você pode estar se perguntando: por que nosso cérebro faz isso? Evolutivamente, tomar decisões rápidas era crucial para a sobrevivência. Era mais eficiente confirmar uma crença (ex: 'aquele barulho é um predador') do que analisar todas as possibilidades. O problema é que, no mundo complexo de hoje, esse atalho pode nos levar a erros de julgamento.
-
-                    Expandindo para a Sociologia, o viés de confirmação é o motor das 'bolhas sociais' e das 'câmaras de eco' nas redes sociais. Grupos se formam em torno de crenças compartilhadas, e os algoritmos nos mostram mais do que já gostamos, reforçando o viés coletivamente. Isso explica, em parte, a polarização política que vemos hoje. Não é apenas um fenômeno individual, mas social.
-
-                    E a Filosofia também tem muito a dizer sobre isso. Francis Bacon, lá no século XVII, já alertava sobre os 'Ídolos da Tribo', que são as tendências da própria natureza humana de distorcer a realidade. O viés de confirmação é um 'Ídolo da Tribo' clássico, um obstáculo fundamental na busca pela verdade objetiva que a filosofia tanto preza.
-
-                    Em resumo, o viés de confirmação é um atalho mental estudado pela psicologia, que é amplificado por dinâmicas sociais e que representa um desafio filosófico antigo na nossa busca por conhecimento.
-
-                    Essa visão integrada ajuda a clarear o conceito? Talvez queira explorar como podemos tentar mitigar os efeitos desse viés no nosso dia a dia?"
-                  placeholder="Instruções personalizadas para a IA, ou deixe em branco para o prompt padrão."
+                  placeholder="Instruções personalizadas para a IA..."
                   className="resize-none"
                   {...field}
                 />
@@ -344,5 +402,7 @@ export function QuizGeneratorForm() {
         </Button>
       </form>
     </Form>
+    </CardContent>
+    </Card>
   );
 }

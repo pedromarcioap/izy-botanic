@@ -1,12 +1,11 @@
-export interface QuizQuestion {
-  question: string;
-  options: string[];
-  correctAnswer: string;
-  explanation?: string;
-}
 
-export interface Quiz {
-  questions: QuizQuestion[];
+import { FieldValue, Timestamp } from 'firebase/firestore';
+
+export interface LibraryItem {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: Timestamp | string;
 }
 
 export interface QuizSettings {
@@ -21,6 +20,18 @@ export interface QuizSettings {
   sourceContent?: string;
 }
 
+export interface Question {
+  question: string;
+  options: string[];
+  correctAnswer: string;
+  explanation?: string; // Made optional
+}
+
+export interface Quiz {
+  title: string;
+  questions: Question[];
+}
+
 export interface UserAnswer {
   question: string;
   selectedAnswer: string;
@@ -30,19 +41,12 @@ export interface UserAnswer {
 export interface QuizAttempt {
   id: string;
   topic: string;
-  timestamp: string;
+  timestamp: Timestamp | string;
   score: number;
   totalQuestions: number;
   answers: UserAnswer[];
   quiz: Quiz;
   settings: QuizSettings;
-}
-
-export interface LibraryItem {
-  id: string;
-  title: string;
-  content: string;
-  createdAt: string;
 }
 
 export interface Message {

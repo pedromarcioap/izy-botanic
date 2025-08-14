@@ -1,27 +1,25 @@
-// src/components/chat/chat-interface.tsx
+
 'use client';
 
 import { useState, useTransition, useEffect, useRef, FormEvent } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Send, Sparkles, User, Bot } from 'lucide-react';
-import type { LibraryItem, QuizAttempt, Message } from '@/lib/types';
-import { talkToMentor, MentorInput } from '@/ai/flows/mentor-chat';
+import { Loader2, Send, Bot, User } from 'lucide-react';
+import type { Message } from '@/lib/types';
+import { talkToMentor } from '@/ai/flows/mentor-chat';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
+interface ChatInterfaceProps {
+  sourceContent?: string;
+}
 
-export function ChatInterface() {
-  const searchParams = useSearchParams();
+export function ChatInterface({ sourceContent }: ChatInterfaceProps) {
   const { toast } = useToast();
   
-  const [libraryItems] = useLocalStorage<LibraryItem[]>('libraryItems', []);
-  const [quizHistory] = useLocalStorage<QuizAttempt[]>('quizHistory', []);
   const [chatHistory, setChatHistory] = useLocalStorage<Message[]>('chatHistory', []);
-
   const [isPending, startTransition] = useTransition();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -38,59 +36,34 @@ export function ChatInterface() {
     scrollToBottom();
   }, [chatHistory]);
 
-  useEffect(() => {
-    const sourceId = searchParams.get('sourceId');
-    const quizId = searchParams.get('quizId');
-    
-    if (sourceId) {
-      const item = libraryItems.find(i => i.id === sourceId);
-      if (item) {
-        const prompt = `Olá! Quero conversar sobre o seguinte material da minha biblioteca: "${item.title}".\n\nConteúdo:\n${item.content}`;
-        const userMessage: Message = { role: 'user', content: prompt };
-        setChatHistory([userMessage]);
-        handleStream(prompt, item.content);
-      }
-    }
-
-    if (quizId) {
-        const item = quizHistory.find(q => q.id === quizId);
-        if(item) {
-            const prompt = `Olá! Quero conversar sobre este quiz que realizei sobre "${item.topic}". Quero que você atue como um tutor e me ajude a entender melhor os pontos que errei.`;
-            const userMessage: Message = { role: 'user', content: prompt };
-            setChatHistory([userMessage]);
-            handleStream(prompt, JSON.stringify(item.quiz, null, 2));
-        }
-    }
-  }, [searchParams, libraryItems, quizHistory]);
-
-  const handleStream = (prompt: string, context?: string) => {
-    const input: MentorInput = {
-      history: chatHistory,
-      prompt,
-      context,
-    };
-
+  const handleResponse = (inputMessages: Message[], context?: string) => {
     startTransition(async () => {
       try {
-        const stream = await talkToMentor(input);
-        let accumulatedText = '';
-        setChatHistory(prev => [...prev, { role: 'model', content: '' }]);
+        const modelMessagePlaceholder: Message = { role: 'model', content: '' };
+        setChatHistory(prev => [...prev, modelMessagePlaceholder]);
+        
+        const responseText = await talkToMentor({
+            messages: inputMessages,
+            sourceContent: context,
+        });
 
-        for await (const chunk of stream) {
-            accumulatedText += chunk;
-            setChatHistory(prev => {
-                const newHistory = [...prev];
-                newHistory[newHistory.length - 1].content = accumulatedText;
-                return newHistory;
-            });
-        }
+        setChatHistory(prev => {
+            const newHistory = [...prev];
+            const lastMessage = newHistory[newHistory.length - 1];
+            if (lastMessage.role === 'model') {
+                lastMessage.content = responseText;
+            }
+            return newHistory;
+        });
+
       } catch (error) {
-        console.error('Streaming error:', error);
+        console.error('API call error:', error);
         toast({
           variant: 'destructive',
           title: 'Erro no Chat',
           description: 'Não foi possível obter uma resposta do mentor. Tente novamente.',
         });
+        setChatHistory(prev => prev.filter(m => m.content !== ''));
       }
     });
   }
@@ -102,9 +75,11 @@ export function ChatInterface() {
     if (!prompt.trim()) return;
 
     const userMessage: Message = { role: 'user', content: prompt };
-    setChatHistory(prev => [...prev, userMessage]);
+    const newHistory = [...chatHistory, userMessage];
+    setChatHistory(newHistory);
     e.currentTarget.reset();
-    handleStream(prompt);
+
+    handleResponse(newHistory, sourceContent);
   };
   
   return (
@@ -120,7 +95,7 @@ export function ChatInterface() {
                     {message.role === 'user' && <User className="h-8 w-8 text-muted-foreground shrink-0" />}
                 </div>
             ))}
-             {isPending && (
+             {isPending && chatHistory[chatHistory.length - 1]?.role === 'model' && (
                 <div className="flex items-start gap-4">
                      <Bot className="h-8 w-8 text-primary shrink-0" />
                      <div className="max-w-[80%] rounded-lg p-3 text-sm bg-muted">

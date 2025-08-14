@@ -1,14 +1,17 @@
+
 'use client';
 
 import { useState, useTransition } from 'react';
-import { useLocalStorage } from '@/hooks/use-local-storage';
-import type { LibraryItem } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { UploadCloud, Loader2 } from 'lucide-react';
+import { db } from '@/lib/firebase';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+
+// Hardcoded user ID for now. This will be replaced by the actual user ID from authentication.
+const TEMP_USER_ID = 'temp-user';
 
 export function MaterialUploader() {
   const [isDragging, setIsDragging] = useState(false);
-  const [libraryItems, setLibraryItems] = useLocalStorage<LibraryItem[]>('libraryItems', []);
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
 
@@ -46,29 +49,36 @@ export function MaterialUploader() {
   };
 
   const processFiles = (files: File[]) => {
-    startTransition(() => {
-        // Simulate processing time
-        setTimeout(() => {
-            files.forEach(file => {
-                // NOTE: This is a mock implementation.
-                // In a real scenario, you would use libraries like pdf.js or mammoth.js
-                // to extract text content from the files.
-                const content = `Conteúdo extraído de ${file.name}. Esta é uma demonstração; a extração real requer bibliotecas adicionais.`;
+    startTransition(async () => {
+      try {
+        const uploadPromises = files.map(file => {
+          const content = `Conteúdo extraído de ${file.name}. Esta é uma demonstração; a extração real requer bibliotecas adicionais.`;
+          
+          const newItem = {
+            title: file.name.replace(/\.[^/.]+$/, ""),
+            content,
+            createdAt: serverTimestamp(),
+          };
+          
+          const libraryCollectionRef = collection(db, 'users', TEMP_USER_ID, 'libraryItems');
+          return addDoc(libraryCollectionRef, newItem);
+        });
 
-                const newItem: LibraryItem = {
-                    id: Date.now().toString() + file.name,
-                    title: file.name.replace(/\.[^/.]+$/, ""),
-                    content,
-                    createdAt: new Date().toISOString(),
-                };
-                setLibraryItems(prevItems => [...prevItems, newItem]);
-            });
+        await Promise.all(uploadPromises);
 
-            toast({
-                title: 'Upload Concluído!',
-                description: `${files.length} material(is) adicionado(s) à sua biblioteca.`,
-            });
-        }, 1000); // 1 second delay to show loading
+        toast({
+            title: 'Upload Concluído!',
+            description: `${files.length} material(is) adicionado(s) à sua biblioteca.`,
+        });
+
+      } catch (error) {
+        console.error("Error uploading to Firestore:", error);
+        toast({
+          variant: 'destructive',
+          title: 'Erro no Upload',
+          description: 'Não foi possível salvar os materiais no banco de dados.',
+        });
+      }
     });
   };
 
